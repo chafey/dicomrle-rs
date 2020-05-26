@@ -1,0 +1,15 @@
+[package]
+name = "dicomrle-rs"
+version = "0.1.0"
+authors = ["Chris Hafey <chafey@gmail.com>"]
+edition = "2018"
+
+[lib]
+name = "image"
+path = "./src/lib.rs"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+byteorder = "1.0"
