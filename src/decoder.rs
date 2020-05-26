@@ -68,6 +68,8 @@ fn decode(_encoded: &mut Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
             }
          }
     }
+
+    // TODO: Consider validating out_index here??
     
     Ok(decoded)
 }
@@ -79,9 +81,13 @@ mod tests {
     use super::decode;
     use std::io::{Read};
 
+    // TODO: get ct1 working (overflow on encoded buffer) - should i tell user?
+    // TODO: test with RGB data
+    // TODO: test with 8 bit gray data
+
     #[test]
     fn happy_path() -> Result<(), Box<dyn Error>> {
-        // read ct1.rle
+        // read ct2.rle
         let mut rle = File::open("tests/rleimage/ct2.rle")?;
         let mut encoded = Vec::new();
         // read the whole file
