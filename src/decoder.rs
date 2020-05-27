@@ -2,9 +2,28 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::io::Cursor;
+use std::time::{Duration, Instant};
 
 #[allow(dead_code)]
-fn decode(_encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<(), Box<dyn Error>> {
+struct DecodeResult {
+    duration: Duration,
+    underflow: bool,
+    useless_marker_count: usize,  // useless == marker value 128 
+    unexpected_segment_offsets: bool
+}
+
+#[allow(dead_code)]
+fn decode(_encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeResult, Box<dyn Error>> {
+
+    let now = Instant::now();
+
+    let mut result = DecodeResult {
+        duration : Duration::new(0,0), 
+        underflow: false, 
+        useless_marker_count: 0,
+        unexpected_segment_offsets: false
+    };
+
     // DICOM RLE Header is 64 bytes (16 u32s)
 
     let mut _reader = Cursor::new(&_encoded);
@@ -12,7 +31,7 @@ fn decode(_encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<(), Box<dyn Error
     // read number of segments from first 4 bytes of header (u32)
     let _num_segments: u32 = _reader.read_u32::<LittleEndian>()?;
     let _num_segs: usize = usize::try_from(_num_segments)?;
-    println!("_num_segments = {:?} _num_segs={:?}", _num_segments, _num_segs);
+    //println!("_num_segments = {:?} _num_segs={:?}", _num_segments, _num_segs);
 
     // TODO: Validate _num_segs <= 15 (as per dicom standard)
 
@@ -21,15 +40,20 @@ fn decode(_encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<(), Box<dyn Error
     for segment in 0..15 {
         segment_start_positions[segment] = _reader.read_u32::<LittleEndian>()?;
         if segment < _num_segs {
-            println!("{:?}  = {:?}", segment, segment_start_positions[segment]);
+            //println!("{:?}  = {:?}", segment, segment_start_positions[segment]);
+        } 
+        if segment >= _num_segs {
+            // if we have a non zero offset for a segment that we shouldn't have, 
+            // set unexpected_segment_offsets to true
+            if segment_start_positions[segment] != 0 {
+                result.unexpected_segment_offsets = true;
+            }
         }
     }
 
-    // TODO: Validate offsets in header for non existant segments is 0 (as per DICOM standard)
-
     // iterate over each segment and decode them
     for segment in 0.._num_segs {
-        println!("decoding segment {:?}", segment);
+        //println!("decoding segment {:?}", segment);
         let start_index:usize = segment_start_positions[segment] as usize;
         let mut end_index:usize = segment_start_positions[segment+1] as usize;
         if segment == (_num_segs - 1) {
@@ -83,14 +107,20 @@ fn decode(_encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<(), Box<dyn Error
                 }
             } else {
                 // output nothing
-                println!("OUTPUT NOTHING 128");
+                result.useless_marker_count = result.useless_marker_count + 1;
             }
-         }
+        }
+        // Check for underflow on last segment
+        if out_index < decoded.len() {
+            result.underflow = true;
+        }
     }
 
-    // TODO: Consider validating out_index here??
-    
-    Ok(())
+    result.duration = now.elapsed();
+
+    //println!("RLE Decode took {} us", result.duration.as_micros());
+
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -124,8 +154,12 @@ mod tests {
         decoded.resize(encoded_size, 0); // TODO: see if we can resize without setting to 0
 
         // decode it
-        decode(&encoded, &mut decoded)?;
-        
+        let result = decode(&encoded, &mut decoded)?;
+        assert_ne!(result.duration.as_micros(), 0);
+        assert_eq!(result.underflow, false);
+        assert_eq!(result.useless_marker_count, 0);
+        assert_eq!(result.unexpected_segment_offsets, false);
+
         // read raw image
         let raw  = read_file(&format!("tests/rawimage/{}.raw", image_name))?;
 
@@ -164,5 +198,60 @@ mod tests {
         compare_rle_to_raw("rf1", 512 * 512 * 1)?; 
         Ok(())
     }
+
+    #[test]
+    fn truncated_image_underflows() -> Result<(), Box<dyn Error>> {
+        // read rle encoded image
+        let mut encoded = read_file("tests/rleimage/rf1.rle")?;
+        encoded.resize(encoded.len() - 1024, 0); // truncate the last 1024 bytes which should cause underflow
+
+        let mut decoded: Vec<u8> = Vec::new();
+        decoded.resize(512 * 512 * 1, 0); // TODO: see if we can resize without setting to 0
+
+        // decode it
+        let result = decode(&encoded, &mut decoded)?;
+        assert_eq!(result.underflow, true);
+
+        Ok(())
+    }
+
+    #[test]
+    fn unexpected_segment_offsets_detected() -> Result<(), Box<dyn Error>> {
+        // read rle encoded image
+        let mut encoded = read_file("tests/rleimage/rf1.rle")?;
+
+        // add an unexpected segment offset 
+        encoded[8] = 1;
+
+        let mut decoded: Vec<u8> = Vec::new();
+        decoded.resize(512 * 512 * 1, 0); // TODO: see if we can resize without setting to 0
+
+        // decode it
+        let result = decode(&encoded, &mut decoded)?;
+        assert_eq!(result.unexpected_segment_offsets, true);
+
+        Ok(())
+    }
+
+    #[test]
+    fn useless_marker_count_detected() -> Result<(), Box<dyn Error>> {
+        // read rle encoded image
+        let mut encoded = read_file("tests/rleimage/rf1.rle")?;
+
+        // add a useless marker in the last byte of the last segment since it is ignored
+        // due to even buffer padding
+        let last_marker = encoded.len() -1;
+        encoded[last_marker] = 128;
+
+        let mut decoded: Vec<u8> = Vec::new();
+        decoded.resize(512 * 512 * 1, 0); // TODO: see if we can resize without setting to 0
+
+        // decode it
+        let result = decode(&encoded, &mut decoded)?;
+        assert_eq!(result.useless_marker_count, 1);
+
+        Ok(())
+    }
+
 
 }
