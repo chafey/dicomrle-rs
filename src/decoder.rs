@@ -1,40 +1,29 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::convert::TryFrom;
 use std::io::Cursor;
-use std::time::{Duration, Instant};
+use std::time::{Instant};
 use crate::error::{Error};
+use crate::decode_diagnostics::{DecodeDiagnostics};
 
 #[allow(dead_code)]
-struct DecodeResult {
-    duration: Duration,
-    underflow: bool,
-    useless_marker_count: usize,  // useless == marker value 128 
-    unexpected_segment_offsets: bool
-}
-
-#[allow(dead_code)]
-fn decode(_encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeResult, Error> {
+fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnostics, Error> {
 
     let now = Instant::now();
-    let mut result = DecodeResult {
-        duration : Duration::new(0,0), 
-        underflow: false, 
-        useless_marker_count: 0,
-        unexpected_segment_offsets: false
-    };
+    let mut result = DecodeDiagnostics::new();
 
     // NOTE: DICOM RLE Header is 64 bytes (16 u32s)
     // 1st u32 is the number of segments
     // 2nd..16th u32 are positions of first byte in each segment
-    let mut _reader = Cursor::new(&_encoded);
+    let mut reader = Cursor::new(&encoded);
 
     // read number of segments from first 4 bytes of header (u32)
     // NOTE: use of unwrap is safe here because we are not targeting CPUs with
     // less than 32 bits
-    let _num_segs: usize = usize::try_from(_reader.read_u32::<LittleEndian>()?).unwrap();
+    // TODO: consider renaming num_segs to segment_count?
+    let num_segs: usize = usize::try_from(reader.read_u32::<LittleEndian>()?).unwrap();
 
-    // Validate _num_segs <= 15 (as per dicom standard)
-    if _num_segs > 15 {
+    // Validate num_segs <= 15 (as per dicom standard)
+    if num_segs > 15 {
         return Err(Error::Format("invalid number of segments".to_owned()));
     }
 
@@ -42,10 +31,10 @@ fn decode(_encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeResult, Err
     // TODO: consider changing segment_start_positions to be a tuple of start/end indexes for each segment
     let mut segment_start_positions: [usize; 16] = [0; 16];
     for segment in 0..15 {
-        segment_start_positions[segment] = _reader.read_u32::<LittleEndian>()? as usize;
+        segment_start_positions[segment] = reader.read_u32::<LittleEndian>()? as usize;
         // if we have a non zero offset for a segment that we shouldn't have, 
         // set unexpected_segment_offsets to true
-        if segment >= _num_segs && segment_start_positions[segment] != 0 {
+        if segment >= num_segs && segment_start_positions[segment] != 0 {
             result.unexpected_segment_offsets = true;
         }
     }
@@ -53,11 +42,11 @@ fn decode(_encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeResult, Err
     // set the starting position of the segment following the number of segments we
     // actually have to the encoded buffer length so we can bound the segment
     // during decode below
-    segment_start_positions[_num_segs] = _encoded.len();
+    segment_start_positions[num_segs] = encoded.len();
 
     // iterate over each segment and decode them
     // TODO: consider renaming segment to segment_number or segment_index?
-    for segment in 0.._num_segs {
+    for segment in 0..num_segs {
         let segment_start_index = segment_start_positions[segment];
         let segment_end_index = segment_start_positions[segment+1];
         let mut in_index = segment_start_index;
@@ -65,49 +54,62 @@ fn decode(_encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeResult, Err
         // If two segments, we assume we have 16 bit grayscale data which requires us to 
         // read MSB first followed by LSB.  If not two segments, we just do normal byte
         // ordering for 8 bit grayscale and 8 bit color images
-        let mut out_index = if _num_segs == 2 {_num_segs - 1 - segment} else { segment };
+        let mut out_index = if num_segs == 2 {num_segs - 1 - segment} else { segment };
         
+        // decode the segment by iterating from the start index to the
+        // end index
         while in_index < segment_end_index {
-            let n = _encoded[in_index];
+            
+            // read control byte
+            let control = encoded[in_index];
             in_index += 1;
            
-            if n <= 127 {
+            if control <= 127 {
                 // literal run case - copy them
-                let _num_raw_bytes = n + 1;
+                
+                let _num_raw_bytes = control + 1;
                 for _ in 0.._num_raw_bytes {
-                    // make sure were not past end of segment
+                    // read literal encoded byte safely
                     if in_index == segment_end_index {
                         break;
                     }
-                    let _raw_value = _encoded[in_index];
+                    let _raw_value = encoded[in_index];
                     in_index += 1;
+
+                    // write literal byte safely
                     if out_index < decoded.len() {
                         decoded[out_index] = _raw_value;
                     }
-                    out_index += _num_segs;
+                    out_index += num_segs;
                 }
-            } else if n > 128 {
+            } else if control > 128 {
+                // replicated run of values case
+
                 // make sure were not past end of segment
                 if in_index == segment_end_index {
                     continue;
                 }
-                // replicated run of values case
-                let mut _run_length = n as i8;
-                let _run_value = _encoded[in_index];
+                
+                // get the run value
+                let run_value = encoded[in_index];
                 in_index += 1;
-                //println!("run of {:?} bytes where value = {:?}", -_run_length, _run_value);
-                let _run_length2 = (0 - _run_length) as i32 + 1;
-                for _ in 0.._run_length2 {
+
+                // calculate the run length
+                let run_length = (0 - control as i8) as i32 + 1;
+
+                // write out run_length count of run_value safely
+                for _ in 0..run_length {
                     if out_index < decoded.len() {
-                        decoded[out_index] = _run_value;
+                        decoded[out_index] = run_value;
                     }
-                    out_index += _num_segs;
+                    out_index += num_segs;
                 }
             } else {
-                // output nothing
+                // output nothing, but set the useless_marker_count for diagnostic purposes
                 result.useless_marker_count = result.useless_marker_count + 1;
             }
         }
+
         // Check for underflow on last segment
         if out_index < decoded.len() {
             result.underflow = true;
@@ -115,8 +117,6 @@ fn decode(_encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeResult, Err
     }
 
     result.duration = now.elapsed();
-
-    //println!("RLE Decode took {} us", result.duration.as_micros());
 
     Ok(result)
 }
@@ -270,7 +270,6 @@ mod tests {
 
         // decode it
         let result = decode(&encoded, &mut decoded);
-        println!("result.is_err()={}", result.is_err());
         assert!(result.is_err(), "decode image with 16 segments should return error");
 
         Ok(())
