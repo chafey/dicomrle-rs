@@ -1,11 +1,10 @@
-//use std::io::{Read};
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::io::Cursor;
 
 #[allow(dead_code)]
-fn decode(_encoded: &mut Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
+fn decode(_encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<(), Box<dyn Error>> {
     // DICOM RLE Header is 64 bytes (16 u32s)
 
     let mut _reader = Cursor::new(&_encoded);
@@ -14,6 +13,8 @@ fn decode(_encoded: &mut Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
     let _num_segments: u32 = _reader.read_u32::<LittleEndian>()?;
     let _num_segs: usize = usize::try_from(_num_segments)?;
     println!("_num_segments = {:?} _num_segs={:?}", _num_segments, _num_segs);
+
+    // TODO: Validate _num_segs <= 15 (as per dicom standard)
 
     // read the starting position of each segment from header (u32)
     let mut segment_start_positions: [u32; 15] = [0; 15];
@@ -24,11 +25,9 @@ fn decode(_encoded: &mut Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
         }
     }
 
-    // iterate over each segment and decode them
-    let mut decoded: Vec<u8> = Vec::new();
-    // TODO: deal with hardcoded size
-    decoded.resize(512 * 512 * 2, 0); // 512 x 512 x 16 bit
+    // TODO: Validate offsets in header for non existant segments is 0 (as per DICOM standard)
 
+    // iterate over each segment and decode them
     for segment in 0.._num_segs {
         println!("decoding segment {:?}", segment);
         let start_index:usize = segment_start_positions[segment] as usize;
@@ -38,20 +37,38 @@ fn decode(_encoded: &mut Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
         }
 
         let mut in_index:usize = start_index;
-        let mut out_index = _num_segs - 1 - segment;
+        // If two segments, we assume we have 16 bit grayscale data which requires us to 
+        // read MSB first followed by LSB.  If not two segments, we just do normal byte
+        // ordering for 8 bit grayscale and 8 bit color images
+        let mut out_index = if _num_segs == 2 {_num_segs - 1 - segment} else { segment };
         while in_index < end_index {
+            //println!("in_index={}", in_index);
+            //if in_index == 248329 {
+            //    let z = 0;
+            //}
             let n:u8 = _encoded[in_index];
             in_index += 1;
+           
             if n <= 127 {
                 // literal run case - copy them
                 let _num_raw_bytes = n + 1;
                 for _ in 0.._num_raw_bytes {
+                    // make sure were not past end of segment
+                    if in_index == end_index {
+                        break;
+                    }
                     let _raw_value = _encoded[in_index];
                     in_index += 1;
-                    decoded[out_index] = _raw_value;
+                    if out_index < decoded.len() {
+                        decoded[out_index] = _raw_value;
+                    }
                     out_index += _num_segs;
                 }
             } else if n > 128 {
+                // make sure were not past end of segment
+                if in_index == end_index {
+                    continue;
+                }
                 // replicated run of values case
                 let mut _run_length = n as i8;
                 let _run_value = _encoded[in_index];
@@ -59,7 +76,9 @@ fn decode(_encoded: &mut Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
                 //println!("run of {:?} bytes where value = {:?}", -_run_length, _run_value);
                 let _run_length2 = (0 - _run_length) as i32 + 1;
                 for _ in 0.._run_length2 {
-                    decoded[out_index] = _run_value;
+                    if out_index < decoded.len() {
+                        decoded[out_index] = _run_value;
+                    }
                     out_index += _num_segs;
                 }
             } else {
@@ -71,7 +90,7 @@ fn decode(_encoded: &mut Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
 
     // TODO: Consider validating out_index here??
     
-    Ok(decoded)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -81,37 +100,69 @@ mod tests {
     use super::decode;
     use std::io::{Read};
 
-    // TODO: get ct1 working (overflow on encoded buffer) - should i tell user?
-    // TODO: test with RGB data
-    // TODO: test with 8 bit gray data
+    fn read_file(filepath: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+        let mut file = File::open(filepath)?;
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer)?;
+        Ok(buffer)
+    }
 
-    #[test]
-    fn happy_path() -> Result<(), Box<dyn Error>> {
-        // read ct2.rle
-        let mut rle = File::open("tests/rleimage/ct2.rle")?;
-        let mut encoded = Vec::new();
-        // read the whole file
-        rle.read_to_end(&mut encoded)?;
-
-        println!("Length of file = {:?}", encoded.len());
-
-        // decode it
-        let decoded = decode(&mut encoded)?;
-        
-        println!("decoded length = {:?}", decoded.len());
-
-        // read ct2.raw
-        let raw = File::open("tests/rawimage/ct2.raw")?;
-
-        // compare decoded buffer with ct1.raw
+    fn images_are_same(first: &Vec<u8>, second: &Vec<u8>) {
         let mut index = 0;
-        let mut _byte_iter = raw.bytes();
+        let mut _byte_iter = first.bytes();
         while let Some(byte) = _byte_iter.next() {
-            //println!("index = {:?}", index);
-            assert_eq!(byte.unwrap(), decoded[index]);
+            assert_eq!(byte.unwrap(), second[index]);
             index +=1 ;
         }
+    }
+
+    fn compare_rle_to_raw(image_name: &str, encoded_size: usize) -> Result<(), Box<dyn Error>> {
+        // read rle encoded image
+        let encoded = read_file(&format!("tests/rleimage/{}.rle", image_name))?;
+
+        let mut decoded: Vec<u8> = Vec::new();
+        decoded.resize(encoded_size, 0); // TODO: see if we can resize without setting to 0
+
+        // decode it
+        decode(&encoded, &mut decoded)?;
+        
+        // read raw image
+        let raw  = read_file(&format!("tests/rawimage/{}.raw", image_name))?;
+
+        // compare decoded buffer with raw image
+        images_are_same(&decoded, &raw);
 
         Ok(())
     }
+
+    #[test]
+    fn verify_ct_decode() -> Result<(), Box<dyn Error>> {
+        compare_rle_to_raw("ct", 512 * 512 * 2)?;
+        Ok(())
+    }
+
+    #[test]
+    fn verify_ct1_decode() -> Result<(), Box<dyn Error>> {
+        compare_rle_to_raw("ct1", 512 * 512 * 2)?; 
+        Ok(())
+    }
+
+    #[test]
+    fn verify_ct2_decode() -> Result<(), Box<dyn Error>> {
+        compare_rle_to_raw("ct2", 512 * 512 * 2)?;
+        Ok(())
+    }
+
+    #[test]
+    fn verify_us1_decode() -> Result<(), Box<dyn Error>> {
+        compare_rle_to_raw("us1", 640 * 480 * 3)?; 
+        Ok(())
+    }
+
+    #[test]
+    fn verify_rf1_decode() -> Result<(), Box<dyn Error>> {
+        compare_rle_to_raw("rf1", 512 * 512 * 1)?; 
+        Ok(())
+    }
+
 }
