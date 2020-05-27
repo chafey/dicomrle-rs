@@ -5,6 +5,9 @@ use std::time::{Instant};
 use crate::error::{Error};
 use crate::decode_diagnostics::{DecodeDiagnostics};
 
+/// decode an DICOM RLE image from encoded into decoded and return Result
+/// containing DecodeDiagnostics or Error.  Note: decoded must be presized
+/// to the expected size of the image.
 #[allow(dead_code)]
 fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnostics, Error> {
 
@@ -19,22 +22,22 @@ fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnostics,
     // read number of segments from first 4 bytes of header (u32)
     // NOTE: use of unwrap is safe here because we are not targeting CPUs with
     // less than 32 bits
-    // TODO: consider renaming num_segs to segment_count?
-    let num_segs: usize = usize::try_from(reader.read_u32::<LittleEndian>()?).unwrap();
+    let segment_count: usize = usize::try_from(reader.read_u32::<LittleEndian>()?).unwrap();
 
     // Validate num_segs <= 15 (as per dicom standard)
-    if num_segs > 15 {
+    if segment_count > 15 {
         return Err(Error::Format("invalid number of segments".to_owned()));
     }
 
     // read the starting position of each segment from header (u32)
-    // TODO: consider changing segment_start_positions to be a tuple of start/end indexes for each segment
+    // NOTE: we allocate an array of 16 positions instead of 15 because we need
+    // an extra slot for the end position of the last segment (when there are 15 segments)
     let mut segment_start_positions: [usize; 16] = [0; 16];
     for segment in 0..15 {
         segment_start_positions[segment] = reader.read_u32::<LittleEndian>()? as usize;
         // if we have a non zero offset for a segment that we shouldn't have, 
         // set unexpected_segment_offsets to true
-        if segment >= num_segs && segment_start_positions[segment] != 0 {
+        if segment >= segment_count && segment_start_positions[segment] != 0 {
             result.unexpected_segment_offsets = true;
         }
     }
@@ -42,19 +45,18 @@ fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnostics,
     // set the starting position of the segment following the number of segments we
     // actually have to the encoded buffer length so we can bound the segment
     // during decode below
-    segment_start_positions[num_segs] = encoded.len();
+    segment_start_positions[segment_count] = encoded.len();
 
     // iterate over each segment and decode them
-    // TODO: consider renaming segment to segment_number or segment_index?
-    for segment in 0..num_segs {
-        let segment_start_index = segment_start_positions[segment];
-        let segment_end_index = segment_start_positions[segment+1];
+    for segment_index in 0..segment_count {
+        let segment_start_index = segment_start_positions[segment_index];
+        let segment_end_index = segment_start_positions[segment_index+1];
         let mut in_index = segment_start_index;
         
         // If two segments, we assume we have 16 bit grayscale data which requires us to 
         // read MSB first followed by LSB.  If not two segments, we just do normal byte
         // ordering for 8 bit grayscale and 8 bit color images
-        let mut out_index = if num_segs == 2 {num_segs - 1 - segment} else { segment };
+        let mut out_index = if segment_count == 2 {segment_count - 1 - segment_index} else { segment_index };
         
         // decode the segment by iterating from the start index to the
         // end index
@@ -80,7 +82,7 @@ fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnostics,
                     if out_index < decoded.len() {
                         decoded[out_index] = _raw_value;
                     }
-                    out_index += num_segs;
+                    out_index += segment_count;
                 }
             } else if control > 128 {
                 // replicated run of values case
@@ -102,7 +104,7 @@ fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnostics,
                     if out_index < decoded.len() {
                         decoded[out_index] = run_value;
                     }
-                    out_index += num_segs;
+                    out_index += segment_count;
                 }
             } else {
                 // output nothing, but set the useless_marker_count for diagnostic purposes
@@ -110,9 +112,9 @@ fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnostics,
             }
         }
 
-        // Check for underflow on last segment
+        // Check for incomplete_decode 
         if out_index < decoded.len() {
-            result.underflow = true;
+            result.incomplete_decode = true;
         }
     }
 
@@ -155,7 +157,7 @@ mod tests {
         // decode it
         let result = decode(&encoded, &mut decoded)?;
         assert_ne!(result.duration.as_micros(), 0);
-        assert_eq!(result.underflow, false);
+        assert_eq!(result.incomplete_decode, false);
         assert_eq!(result.useless_marker_count, 0);
         assert_eq!(result.unexpected_segment_offsets, false);
 
@@ -209,7 +211,7 @@ mod tests {
 
         // decode it
         let result = decode(&encoded, &mut decoded)?;
-        assert_eq!(result.underflow, true);
+        assert_eq!(result.incomplete_decode, true);
 
         Ok(())
     }
@@ -305,11 +307,12 @@ mod tests {
         decoded.resize(512 * 512 * 1, 0); 
 
         // decode it
-        let result = decode(&encoded, &mut decoded);
-        assert!(result.is_err(), "decode image with length 5 should return error");
-
+        if let Err(result) = decode(&encoded, &mut decoded) {
+            eprintln!("{:#}", result);
+        } else {
+            assert!(false, "decode image with length 5 should return error");
+        }
+        
         Ok(())
     }
-
-
 }
