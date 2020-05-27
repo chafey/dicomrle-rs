@@ -167,6 +167,8 @@ mod tests {
         // compare decoded buffer with raw image
         images_are_same(&decoded, &raw);
 
+        println!("Decode Took {} us", result.duration.as_micros());
+
         Ok(())
     }
 
