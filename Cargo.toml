@@ -5,7 +5,7 @@ authors = ["Chris Hafey <chafey@gmail.com>"]
 edition = "2018"
 
 [lib]
-name = "image"
+name = "dicomrle"
 path = "./src/lib.rs"
 
 

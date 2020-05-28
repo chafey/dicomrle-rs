@@ -3,13 +3,42 @@ use std::convert::TryFrom;
 use std::io::Cursor;
 use std::time::{Instant};
 use crate::error::{Error};
-use crate::decode_diagnostics::{DecodeDiagnostics};
+use crate::diagnostics::{DecodeDiagnostics};
 
-/// decode an DICOM RLE image from encoded into decoded and return Result
-/// containing DecodeDiagnostics or Error.  Note: decoded must be presized
-/// to the expected size of the image.
+/// Decodes an DICOM RLE image.
+/// 
+/// # Arguments
+///
+/// * `encoded` - The encoded RLE bytes
+/// 
+/// * `decoded` - The decoded bytes will be stored here.  Must be presized to
+///               the expected number of decoded bytes.
+/// # Examples
+/// ```
+/// use dicomrle::decoder::{decode};
+/// fn get_rle_image() -> Vec<u8> {
+///   // create empty RLE encoded image
+///   let mut encoded:Vec<u8> = Vec::new(); 
+///   encoded.resize(64, 0);
+///   encoded 
+/// }
+/// fn main() {
+///   // get rle encoded image (e.g. from DICOM P10)
+///   let encoded:Vec<u8> = get_rle_image(); 
+///   // allocate decoded buffer and presize to 512k
+///   let mut decoded: Vec<u8> = Vec::new();
+///   decoded.resize(512 * 512 * 2, 0); 
+///   // decode it
+///   let diagnostics = decode(&encoded, &mut decoded).unwrap();
+///   // print diagnostics
+///   println!("RLE Image Decode took {} us", diagnostics.duration.as_micros());
+///   println!("Incomplete Decode: {}", diagnostics.incomplete_decode);
+///   println!("Useless Marker Count: {}", diagnostics.useless_marker_count);
+///   println!("Unexpectged Segment Offsets: {}", diagnostics.unexpected_segment_offsets);
+/// }
+/// ```
 #[allow(dead_code)]
-fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnostics, Error> {
+pub fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnostics, Error> {
 
     let now = Instant::now();
     let mut result = DecodeDiagnostics::new();
