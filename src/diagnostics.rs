@@ -1,11 +1,6 @@
-use std::time::{Duration};
-
 #[allow(dead_code)]
 /// Diagnostic information related to decoding an RLE image
 pub struct DecodeDiagnostics {
-    /// The time it took to decode the image
-    pub duration: Duration,
-
     /// true if the decoded buffer was not fully populated during the
     /// decode process of the last segment.  This indicates either a
     /// truncated buffer or an invalid rle encoding.  In both cases,
@@ -28,7 +23,6 @@ pub struct DecodeDiagnostics {
 impl DecodeDiagnostics {
     pub fn new() -> DecodeDiagnostics {
         DecodeDiagnostics {
-            duration: Duration::new(0,0),
             incomplete_decode: false,
             useless_marker_count: 0,
             unexpected_segment_offsets: false

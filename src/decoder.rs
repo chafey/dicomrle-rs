@@ -1,7 +1,6 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::convert::TryFrom;
 use std::io::Cursor;
-use std::time::{Instant};
 use crate::error::{Error};
 use crate::diagnostics::{DecodeDiagnostics};
 
@@ -31,7 +30,6 @@ use crate::diagnostics::{DecodeDiagnostics};
 ///   // decode it
 ///   let diagnostics = decode(&encoded, &mut decoded).unwrap();
 ///   // print diagnostics
-///   println!("RLE Image Decode took {} us", diagnostics.duration.as_micros());
 ///   println!("Incomplete Decode: {}", diagnostics.incomplete_decode);
 ///   println!("Useless Marker Count: {}", diagnostics.useless_marker_count);
 ///   println!("Unexpectged Segment Offsets: {}", diagnostics.unexpected_segment_offsets);
@@ -40,7 +38,6 @@ use crate::diagnostics::{DecodeDiagnostics};
 #[allow(dead_code)]
 pub fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnostics, Error> {
 
-    let now = Instant::now();
     let mut result = DecodeDiagnostics::new();
 
     // NOTE: DICOM RLE Header is 64 bytes (16 u32s)
@@ -147,8 +144,6 @@ pub fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnost
         }
     }
 
-    result.duration = now.elapsed();
-
     Ok(result)
 }
 
@@ -185,7 +180,6 @@ mod tests {
 
         // decode it
         let result = decode(&encoded, &mut decoded)?;
-        assert_ne!(result.duration.as_micros(), 0);
         assert_eq!(result.incomplete_decode, false);
         assert_eq!(result.useless_marker_count, 0);
         assert_eq!(result.unexpected_segment_offsets, false);
@@ -195,8 +189,6 @@ mod tests {
 
         // compare decoded buffer with raw image
         images_are_same(&decoded, &raw);
-
-        println!("Decode Took {} us", result.duration.as_micros());
 
         Ok(())
     }
