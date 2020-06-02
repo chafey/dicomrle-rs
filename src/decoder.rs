@@ -89,7 +89,7 @@ pub fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnost
         while in_index < segment_end_index {
             
             // read control byte
-            let control = encoded[in_index];
+            let &control = encoded.get(in_index).ok_or(Error::Format("unexpected eof reading segment".to_string()))?;
             in_index += 1;
            
             if control <= 127 {
@@ -101,7 +101,7 @@ pub fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnost
                     if in_index == segment_end_index {
                         break;
                     }
-                    let _raw_value = encoded[in_index];
+                    let &_raw_value = encoded.get(in_index).ok_or(Error::Format("unexpected eof reading segment".to_string()))?;
                     in_index += 1;
 
                     // write literal byte safely
@@ -119,7 +119,7 @@ pub fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnost
                 }
                 
                 // get the run value
-                let run_value = encoded[in_index];
+                let &run_value = encoded.get(in_index).ok_or(Error::Format("unexpected eof reading segment".to_string()))?;
                 in_index += 1;
 
                 // calculate the run length
@@ -240,6 +240,28 @@ mod tests {
     }
 
     #[test]
+    fn truncated_image_in_first_segment() -> Result<(), Error> {
+        // read rle encoded image
+        let mut encoded = read_file("tests/rleimage/ct.rle")?;
+        
+        // truncate so we only have 7933 bytes
+        encoded.resize(7933, 0); 
+
+        let mut decoded: Vec<u8> = Vec::new();
+        decoded.resize(512 * 512 * 1, 0);
+
+        // decode it
+        let result = decode(&encoded, &mut decoded);
+        assert!(result.is_err(), "truncated image in first segment should fail");
+        if let Err(result) = result {
+            println!("Error: {}", result);
+        }
+
+        Ok(())
+    }
+
+
+    #[test]
     fn unexpected_segment_offsets_detected() -> Result<(), Error> {
         // read rle encoded image
         let mut encoded = read_file("tests/rleimage/rf1.rle")?;
@@ -323,18 +345,20 @@ mod tests {
         // read rle encoded image
         let mut encoded = read_file("tests/rleimage/rf1.rle")?;
 
-        // Resize buffer so num segments cannot be fully read
+        // Resize buffer so first segment offset cannot be read
         encoded.resize(5, 0);
 
         let mut decoded: Vec<u8> = Vec::new();
         decoded.resize(512 * 512 * 1, 0); 
 
         // decode it
-        if let Err(result) = decode(&encoded, &mut decoded) {
-            eprintln!("{:#}", result);
+        let result = decode(&encoded, &mut decoded);
+        if let Err(result) = result  {
+            eprintln!("Error: {:#}", result);
         } else {
             assert!(false, "decode image with length 5 should return error");
         }
+        
         
         Ok(())
     }
