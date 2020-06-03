@@ -3,21 +3,19 @@ DICOM RLE Codec written in Rust
 
 ## Goal
 
-Full implementation of a DICOM RLE CODEC delivered as a rust library and a webassembly module
-with javascript bindings.
+Full implementation of a DICOM RLE CODEC that runs in WebAssembly.
+
+See the [dicomrle-wasm repository](https://github.com/chafey/dicomrle-wasm) for the 
+WebAssembly version
 
 ## Status
 
-Actively being developed (May 28, 2020)
+Actively being developed (Jun 3, 2020)
 
 ## Tasks
 
 - [x] Implement Decoder
 - [ ] Implement Encoder
-- [ ] Create WebAssembly Build
-- [ ] Create JS Glue for WebAssembly Build
-- [ ] Create NodeJS Demo Application using WebAssembly Build
-- [ ] Create HTML/JS Demo Application using WebAssembly Build
 - [ ] Create Performance Bechmarks
 
 ## Relevant Links
@@ -38,31 +36,16 @@ properly detect incomplete decodes.  Since this decoder is designed to
 decode DICOM RLE Images, the caller should have access to the DICOM Header
 which contains the attributes needed to calculate the size of the decoded
 image buffer (specifically - rows, columns, bits allocated and samples per 
-pixel).
+pixel).  Presizing the buffer also slightly improves the performance as the
+buffer never has to be expanded (which may involve a copy operation)
 
 ### Stream Support
 
-Support for decoding from a Read stream is not currently supported.  While
-technically possible, the decode logic is simplified by knowing the full
-size of the encoded bitstream up front.
+RLE decoding cannot be streamed on both the input and output simultaneously
+because RLE encoded images typically contain multiple segments which must be
+interleaved.  It is theoretically possible to stream either the input or output,
+but not both simultaenously.  Streaming the output would be the better choice
+since it is bigger, but this would complicate the decoder logic as it would
+have to deal with all segments concurrently.  I decided to attempt this and
+keep the decoder simpler.
 
-Support for decoding to a Write stream is not currently supported.  While
-technically possible, the decode logic is simplified by knowing the full
-size of the decoded image up front.  
-
-Note that you cannot properly support Read and Write streams at the same time
-without buffering one of them due to the deinterleaving of pixel data accross
-segments that is part of the DICOM RLE.  This fact reduces the value of having
-a full stream based API which could mislead the caller into thinking it has
-low memory overhead when it can't due to the variable sized internal buffering
-that would be required.
-
-### Bounds Checking
-
-The decoder currently performs a lot of manual bounds checking, some of which
-may be redundant to that being done by Vector or unnecessary with 
-different logic.  
-
-It feels like an iterator based design would simplify, improve performance 
-and open the door for parallelization.  This is an area to consider in the
-future.
