@@ -3,6 +3,17 @@ use std::io::Cursor;
 use std::convert::TryFrom;
 use byteorder::{LittleEndian, ReadBytesExt};
 
+// helper function to read usize from the header
+fn read_usize(cursor: &mut Cursor<&&[u8]>) -> usize {
+    // read u32 from the cursor.  Note that the unwrap() is safe here because
+    // we previously validated the length of the header
+    let value = cursor.read_u32::<LittleEndian>().unwrap();
+
+    // convert from u32 to usize.  Note that unwrap() is safe here because
+    // we are not targeting platforms with less than 32 bits
+    usize::try_from(value).unwrap()
+}
+
 #[allow(dead_code)]
 pub fn read_header(header_bytes: &[u8]) -> Result<Vec<usize>, Error> {
     // The DICOM RLE header is 64 bytes, validate to make sure we have
@@ -11,14 +22,11 @@ pub fn read_header(header_bytes: &[u8]) -> Result<Vec<usize>, Error> {
         return Err(Error::Format("unexpected eof reading header".to_owned()));
     }
 
-    // Create a Cursor so we can convert bytes to u32s
+    // Create a Cursor on the header bytes so we can read usizes
     let mut reader = Cursor::new(&header_bytes);
 
-    // The first u32 in the header is the number of segments - read it and validate
-    // it.  Note that the se of unwrap here is safe because we previously
-    // validated there is enough bytes to read from and we are not targeting CPU's <
-    // 32 bits so u32 will always convert into usize without loss
-    let segment_count = usize::try_from(reader.read_u32::<LittleEndian>().unwrap()).unwrap();
+    // Read the segment count from the beginning of header  
+    let segment_count = read_usize(&mut reader);
 
     // validate number of segments
     if segment_count > 15 {
@@ -30,9 +38,8 @@ pub fn read_header(header_bytes: &[u8]) -> Result<Vec<usize>, Error> {
 
     // read each segment offset into a vector
     let mut segment_offsets:Vec<usize> = Vec::new();
-
     for _ in 0..segment_count {
-        let segment_offset = usize::try_from(reader.read_u32::<LittleEndian>().unwrap()).unwrap();
+        let segment_offset = read_usize(&mut reader);
         segment_offsets.push(segment_offset);
     }
 
@@ -54,22 +61,8 @@ pub fn read_header(header_bytes: &[u8]) -> Result<Vec<usize>, Error> {
 #[cfg(test)]
 mod tests {
     use super::read_header;
-    use byteorder::{LittleEndian, ByteOrder};
-
-    fn make_header(values: &mut Vec<u32>) -> Vec<u8> {
-        // make sure we have exactly 16 u32s
-        values.resize(16, 0);
-
-        // allocate size for the header bytes
-        let mut header = Vec::new();
-        header.resize(64, 0);
-
-        // write the u32s to the header bytes
-        LittleEndian::write_u32_into(&values, &mut header);
-
-        header
-    }
-
+    use crate::test::tests::{make_header};
+    
     #[test]
     fn one_segment_header() {
         let encoded = make_header(&mut vec![1,64]);
