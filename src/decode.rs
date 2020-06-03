@@ -14,6 +14,14 @@ fn calculate_start_index(segment_count: usize, segment_index: usize) -> usize {
     }
 }
 
+/// Decodes a DICOM RLE Image
+/// 
+/// # Arguments
+///
+/// * `encoded`   - The encoded RLE image
+///
+/// * `decoded`   - The decoded buffer, presized to the expected image size
+/// 
 #[allow(dead_code)]
 pub fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnostics, Error> {
 
@@ -84,8 +92,6 @@ mod tests {
         // decode it
         let result = decode(&encoded, &mut decoded).unwrap();
         assert_eq!(result.incomplete_decode, true);
-        assert_eq!(result.useless_marker_count, 0);
-        assert_eq!(result.unexpected_segment_offsets, false);
     }
 
     #[test]
@@ -99,8 +105,6 @@ mod tests {
         // decode it
         let result = decode(&encoded, &mut decoded).unwrap();
         assert_eq!(result.incomplete_decode, true);
-        assert_eq!(result.useless_marker_count, 0);
-        assert_eq!(result.unexpected_segment_offsets, false);
     }
 
     #[test]
@@ -114,8 +118,6 @@ mod tests {
         // decode it
         let result = decode(&encoded, &mut decoded).unwrap();
         assert_eq!(result.incomplete_decode, true);
-        assert_eq!(result.useless_marker_count, 0);
-        assert_eq!(result.unexpected_segment_offsets, false);
     }
 
     #[test]
@@ -129,8 +131,6 @@ mod tests {
         // decode it
         let result = decode(&encoded, &mut decoded).unwrap();
         assert_eq!(result.incomplete_decode, true);
-        assert_eq!(result.useless_marker_count, 0);
-        assert_eq!(result.unexpected_segment_offsets, false);
     }
 
 }

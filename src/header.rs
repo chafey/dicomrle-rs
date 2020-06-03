@@ -14,6 +14,16 @@ fn read_usize(cursor: &mut Cursor<&&[u8]>) -> usize {
     usize::try_from(value).unwrap()
 }
 
+/// Parses the DICOM RLE Header and returns the starting offset for each
+/// segment.  Retruns errors in the following cases
+///     1) Header is not long enough
+///     2) Number of segments is invalid - must be 1..15 inclusive
+///     3) Segment offsets are ascending in value
+/// 
+/// # Arguments
+///
+/// * `header_bytes` - The DICOM RLE Header
+/// 
 #[allow(dead_code)]
 pub fn read_header(header_bytes: &[u8]) -> Result<Vec<usize>, Error> {
     // The DICOM RLE header is 64 bytes, validate to make sure we have

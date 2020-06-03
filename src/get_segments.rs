@@ -20,24 +20,34 @@ fn header_to_segment_bounds(encoded: &Vec<u8>) -> Result<Vec<(usize, usize)>, Er
     Ok(segment_bounds)
 }
 
+/// Returns a vector of u8 slices for each segment in the RLE encoded bitstream.
+/// If the encoded buffer is truncated, the correct number of u8 slices will
+/// be returned, but their length may be zero or truncated.
+/// 
+/// # Arguments
+///
+/// * `encoded`   - The encoded RLE image
+///
+/// * `decoded`   - The decoded buffer, presized to the expected image size
+/// 
 pub fn get_segments(encoded: &Vec<u8>) -> Result<Vec<&[u8]>, Error> {
-    let mut foo = Vec::new();
+    let mut segments = Vec::new();
 
     let segment_bounds = header_to_segment_bounds(encoded)?;
 
     for segment in segment_bounds {
         if segment.0 > encoded.len() {
-            foo.push(&encoded[0..0])
+            segments.push(&encoded[0..0])
         } else {
             if segment.1 > encoded.len() {
-                foo.push(&encoded[segment.0..])
+                segments.push(&encoded[segment.0..])
             } else {
-                foo.push(&encoded[segment.0..segment.1])
+                segments.push(&encoded[segment.0..segment.1])
             }
         }
     }
 
-    Ok(foo)
+    Ok(segments)
 }
 
 #[cfg(test)]

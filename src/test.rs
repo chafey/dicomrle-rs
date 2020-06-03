@@ -22,9 +22,9 @@ pub mod tests {
 
     #[allow(dead_code)]
     pub fn read_file(filepath: &str) -> Result<Vec<u8>, Error> {
-        let mut file = File::open(filepath)?;
+        let mut file = File::open(filepath).unwrap();
         let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)?;
+        file.read_to_end(&mut buffer).unwrap();
         Ok(buffer)
     }
 
@@ -54,8 +54,6 @@ pub mod tests {
         // decode it
         let result = decode(&encoded, &mut decoded)?;
         assert_eq!(result.incomplete_decode, false);
-        assert_eq!(result.useless_marker_count, 0);
-        assert_eq!(result.unexpected_segment_offsets, false);
 
         // read raw image
         let raw  = read_file(&format!("tests/rawimage/{}.raw", image_name))?;

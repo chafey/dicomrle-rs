@@ -1,7 +1,4 @@
-extern crate byteorder;
-
 pub mod decode;
-pub mod decoder;
 pub mod error;
 pub mod diagnostics;
 mod header;
