@@ -1,3 +1,5 @@
+use crate::decode_segment::{DecodeSegmentResult};
+
 #[allow(dead_code)]
 /// Diagnostic information related to decoding an RLE image
 pub struct DecodeDiagnostics {
@@ -8,16 +10,16 @@ pub struct DecodeDiagnostics {
     /// Note that a truncated buffer or invalid rle encoding can
     /// also result in an IoError
     pub incomplete_decode: bool,
-
-    /// The number of control bytes of value 128 encountered during the
-    /// decoding.  This indicates a larger than necessary bitstream but
-    /// has no effect on the decoded image.
-    pub useless_marker_count: usize, 
-
+    
     /// true if the header included non zero offset values for segments not
     /// included in the encoded bitstream.  This condition does not effect
     /// the decoded image 
-    pub unexpected_segment_offsets: bool
+    pub unexpected_segment_offsets: bool,
+
+    pub decode_segment_results: Vec<DecodeSegmentResult>,
+
+    // TODO: get rid of this..
+    pub useless_marker_count: usize
 }
 
 impl DecodeDiagnostics {
@@ -25,7 +27,8 @@ impl DecodeDiagnostics {
         DecodeDiagnostics {
             incomplete_decode: false,
             useless_marker_count: 0,
-            unexpected_segment_offsets: false
+            unexpected_segment_offsets: false,
+            decode_segment_results : Vec::new()
         }
     }
 }

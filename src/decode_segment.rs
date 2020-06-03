@@ -121,7 +121,7 @@ pub fn decode_segment(segment: &[u8], decoded: &mut[u8], increment: usize) -> De
         }
     }
 
-    result.bytes_decoded = decoded_index;
+    result.bytes_decoded = decoded_index / increment;
 
     result
 }
@@ -255,6 +255,19 @@ mod tests {
         assert_eq!(false, result.literal_run_underflow);
         assert_eq!(false, result.replicated_run_underflow);
         assert_eq!(true, result.decoded_overflow);
+        assert_eq!(false, result.invalid_prefix);
+    }
+
+    #[test]
+    fn zero_length_segment() {
+        let segment = vec![];
+        let mut decoded = Vec::new();
+        decoded.resize(0, 0);
+        let result = decode_segment(&segment, &mut decoded, 1);
+        assert_eq!(0, result.bytes_decoded);
+        assert_eq!(false, result.literal_run_underflow);
+        assert_eq!(false, result.replicated_run_underflow);
+        assert_eq!(false, result.decoded_overflow);
         assert_eq!(false, result.invalid_prefix);
     }
 }
