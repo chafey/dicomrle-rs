@@ -322,44 +322,5 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn verify_incomplete_header_at_num_segments_fails() -> Result<(), Error> {
-        // read rle encoded image
-        let mut encoded = read_file("tests/rleimage/rf1.rle")?;
-
-        // Resize buffer so num segments cannot be fully read
-        encoded.resize(2, 0);
-
-        let mut decoded: Vec<u8> = Vec::new();
-        decoded.resize(512 * 512 * 1, 0); 
-
-        // decode it
-        let result = decode(&encoded, &mut decoded);
-        assert!(result.is_err(), "decode image with length 2 should return error");
-
-        Ok(())
-    }
-
-    #[test]
-    fn verify_incomplete_header_at_segment_offset_fails() -> Result<(), Error> {
-        // read rle encoded image
-        let mut encoded = read_file("tests/rleimage/rf1.rle")?;
-
-        // Resize buffer so first segment offset cannot be read
-        encoded.resize(5, 0);
-
-        let mut decoded: Vec<u8> = Vec::new();
-        decoded.resize(512 * 512 * 1, 0); 
-
-        // decode it
-        let result = decode(&encoded, &mut decoded);
-        if let Err(result) = result  {
-            eprintln!("Error: {:#}", result);
-        } else {
-            assert!(false, "decode image with length 5 should return error");
-        }
-        
-        
-        Ok(())
-    }
+    
 }

@@ -16,45 +16,8 @@
                     "--package=dicomrle-rs"
                 ],
                 "filter": {
-                    "name": "image",
+                    "name": "dicomrle",
                     "kind": "lib"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug executable 'dicomrle-rs'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--bin=dicomrle-rs",
-                    "--package=dicomrle-rs"
-                ],
-                "filter": {
-                    "name": "dicomrle-rs",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'dicomrle-rs'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=dicomrle-rs",
-                    "--package=dicomrle-rs"
-                ],
-                "filter": {
-                    "name": "dicomrle-rs",
-                    "kind": "bin"
                 }
             },
             "args": [],
