@@ -10,14 +10,14 @@ pub struct DecodeDiagnostics {
     pub incomplete_decode: bool,
     
     /// diagnostic information about each decoded segment
-    pub decode_segment_results: Vec<DecodeSegmentResult>,
+    pub decode_segment_results: [Option<DecodeSegmentResult>;15],
 }
 
 impl DecodeDiagnostics {
     pub fn new() -> DecodeDiagnostics {
         DecodeDiagnostics {
             incomplete_decode: false,
-            decode_segment_results : Vec::new()
+            decode_segment_results : [None; 15]
         }
     }
 }

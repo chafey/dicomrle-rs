@@ -43,7 +43,7 @@ pub fn decode(encoded: &[u8], decoded: &mut [u8]) -> Result<DecodeDiagnostics, E
             decode_result.incomplete_decode = true;
         }
 
-        decode_result.decode_segment_results.push(result);
+        decode_result.decode_segment_results[segment_index] = Some(result);
     }
 
     Ok(decode_result)

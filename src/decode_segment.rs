@@ -1,5 +1,6 @@
 
 // the result of decoding a single rle segment
+#[derive(Copy, Clone)]
 pub struct DecodeSegmentResult {
     // the number of bytes actually decoded
     pub bytes_decoded: usize,

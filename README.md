@@ -55,9 +55,9 @@ have no need for streaming functionality.
 
 This library makes minimal use of the standard library.  Use of the standard
 library could probably be eliminated which would produce slightly smaller
-WebAssembly binaries at the expense of some readability.  This is something
-that should be revisited - starting with eliminating use of the standard 
-library from the public interface.
+WebAssembly binaries.  The public interface does not depend on the standard
+library so accomplishing this is just a matter of modifying the internal
+implementation.
 
 ### Unsafe code
 

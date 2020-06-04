@@ -1,5 +1,3 @@
-use std::fmt;
-
 /// Errors that can occur while decoding an image.
 #[derive(Debug)]
 pub enum Error {
@@ -8,10 +6,3 @@ pub enum Error {
     Format(String)
 }
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Error::Format(ref desc)      => write!(f, "{}", desc)
-        }
-    }
-}
