@@ -12,7 +12,7 @@ fn to_segment_bounds(segment_offsets:&Vec<usize>, encoded_length: usize) -> Vec<
     result
 }
 
-fn header_to_segment_bounds(encoded: &Vec<u8>) -> Result<Vec<(usize, usize)>, Error> {
+fn header_to_segment_bounds(encoded: &[u8]) -> Result<Vec<(usize, usize)>, Error> {
     let segment_offsets = read_header(encoded)?;
 
     let segment_bounds = to_segment_bounds(&segment_offsets, encoded.len());
@@ -30,7 +30,7 @@ fn header_to_segment_bounds(encoded: &Vec<u8>) -> Result<Vec<(usize, usize)>, Er
 ///
 /// * `decoded`   - The decoded buffer, presized to the expected image size
 /// 
-pub fn get_segments(encoded: &Vec<u8>) -> Result<Vec<&[u8]>, Error> {
+pub fn get_segments(encoded: &[u8]) -> Result<Vec<&[u8]>, Error> {
     let mut segments = Vec::new();
 
     let segment_bounds = header_to_segment_bounds(encoded)?;

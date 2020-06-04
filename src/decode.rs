@@ -2,7 +2,7 @@ use crate::error::{Error};
 use crate::diagnostics::{DecodeDiagnostics};
 use crate::decode_segment::*;
 use crate::get_segments::{get_segments};
-
+use std::slice;
 // If two segments, we assume we have 16 bit grayscale data which requires us to 
 // read MSB first followed by LSB.  If not two segments, we just do normal byte
 // ordering for 8 bit grayscale and 8 bit color images
@@ -23,7 +23,7 @@ fn calculate_start_index(segment_count: usize, segment_index: usize) -> usize {
 /// * `decoded`   - The decoded buffer, presized to the expected image size
 /// 
 #[allow(dead_code)]
-pub fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnostics, Error> {
+pub fn decode(encoded: &[u8], decoded: &mut [u8]) -> Result<DecodeDiagnostics, Error> {
 
     let segments = get_segments(encoded)?;
 
@@ -49,14 +49,80 @@ pub fn decode(encoded: &Vec<u8>, decoded: &mut Vec<u8>) -> Result<DecodeDiagnost
     Ok(decode_result)
 }
 
+pub fn decode_u16(encoded: &[u8], decoded: &mut [u16]) -> Result<DecodeDiagnostics, Error> {
+    let mut decoded_u8 = unsafe { 
+        let ptr = decoded.as_mut_ptr() as *mut u8; 
+        slice::from_raw_parts_mut(ptr, decoded.len() * 2) 
+    };
+    decode(encoded, &mut decoded_u8)
+}
+
+pub fn decode_i16(encoded: &[u8], decoded: &mut [i16]) -> Result<DecodeDiagnostics, Error> {
+    let mut decoded_u8 = unsafe { 
+        let ptr = decoded.as_mut_ptr() as *mut u8; 
+        slice::from_raw_parts_mut(ptr, decoded.len() * 2) 
+    };
+    decode(encoded, &mut decoded_u8)
+}
+
+
 #[cfg(test)]
 mod tests {
     use crate::test::tests::*;
-    use super::decode;
+    use super::{decode, decode_i16, decode_u16};
+    use std::slice;
 
     #[test]
     fn verify_ct_decode() {
         compare_rle_to_raw("ct", 512 * 512 * 2).unwrap();
+    }
+
+    #[test]
+    fn verify_ct_decode_i16() {
+        // read rle encoded image
+        let encoded = read_file(&format!("tests/rleimage/ct.rle")).unwrap();
+
+        let mut decoded: Vec<i16> = Vec::new();
+        decoded.resize(512 * 512, 0);
+
+        // decode it
+        let result = decode_i16(&encoded, &mut decoded).unwrap();
+        assert_eq!(result.incomplete_decode, false);
+
+        // read raw image
+        let raw  = read_file(&format!("tests/rawimage/ct.raw")).unwrap();
+        
+        let raw_i16 = unsafe { 
+            let ptr = raw.as_ptr() as *mut i16; 
+            slice::from_raw_parts_mut(ptr, raw.len() / 2)
+        };
+
+        // compare decoded buffer with raw image
+        images_are_same(&decoded, &raw_i16);
+    }
+
+    #[test]
+    fn verify_ct_decode_u16() {
+        // read rle encoded image
+        let encoded = read_file(&format!("tests/rleimage/ct.rle")).unwrap();
+
+        let mut decoded: Vec<u16> = Vec::new();
+        decoded.resize(512 * 512, 0);
+
+        // decode it
+        let result = decode_u16(&encoded, &mut decoded).unwrap();
+        assert_eq!(result.incomplete_decode, false);
+
+        // read raw image
+        let raw  = read_file(&format!("tests/rawimage/ct.raw")).unwrap();
+        
+        let raw_u16 = unsafe { 
+            let ptr = raw.as_ptr() as *mut u16; 
+            slice::from_raw_parts_mut(ptr, raw.len() / 2)
+        };
+
+        // compare decoded buffer with raw image
+        images_are_same(&decoded, &raw_u16);
     }
 
     #[test]

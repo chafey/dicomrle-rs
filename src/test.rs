@@ -28,18 +28,14 @@ pub mod tests {
         Ok(buffer)
     }
 
-    #[allow(dead_code)]
-    pub fn images_are_same(first: &Vec<u8>, second: &Vec<u8>) {
-        let mut index = 0;
-        let mut _byte_iter = first.bytes();
-        while let Some(byte) = _byte_iter.next() {
-            let decoded = byte.unwrap();
-            let raw = second[index];
-
-            if decoded != raw {
-                assert!(false, format!("different found at position {} {}!={}", index, decoded, raw));
+    pub fn images_are_same<T>(a: &[T], b: &[T])
+    where T: PartialEq + std::fmt::Display
+    {
+        assert_eq!(a.len(), b.len());
+        for i in 0..a.len() {
+            if a[1] != b[1] {
+                assert!(false, format!("difference found at position {} {}!={}", i, a[i], b[i]));
             }
-            index +=1;
         }
     }
 
