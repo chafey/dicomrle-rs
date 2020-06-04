@@ -1,3 +1,5 @@
+//#![no_std]
+
 pub mod decode;
 pub mod error;
 pub mod diagnostics;
