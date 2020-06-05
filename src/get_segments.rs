@@ -1,14 +1,14 @@
+use crate::error::Error;
 use crate::header::read_header;
-use crate::error::{Error};
 
-fn to_segment_bounds(segment_offsets:&Vec<usize>, encoded_length: usize) -> Vec<(usize, usize)> {
+fn to_segment_bounds(segment_offsets: &Vec<usize>, encoded_length: usize) -> Vec<(usize, usize)> {
     let mut result = Vec::new();
-    for segment_index in 0..segment_offsets.len()-1 {
+    for segment_index in 0..segment_offsets.len() - 1 {
         let start = segment_offsets[segment_index];
-        let end = segment_offsets[segment_index+1];
+        let end = segment_offsets[segment_index + 1];
         result.push((start, end))
     }
-    result.push((segment_offsets[segment_offsets.len()-1], encoded_length));
+    result.push((segment_offsets[segment_offsets.len() - 1], encoded_length));
     result
 }
 
@@ -23,13 +23,13 @@ fn header_to_segment_bounds(encoded: &[u8]) -> Result<Vec<(usize, usize)>, Error
 /// Returns a vector of u8 slices for each segment in the RLE encoded bitstream.
 /// If the encoded buffer is truncated, the correct number of u8 slices will
 /// be returned, but their length may be zero or truncated.
-/// 
+///
 /// # Arguments
 ///
 /// * `encoded`   - The encoded RLE image
 ///
 /// * `decoded`   - The decoded buffer, presized to the expected image size
-/// 
+///
 pub fn get_segments(encoded: &[u8]) -> Result<Vec<&[u8]>, Error> {
     let mut segments = Vec::new();
 
@@ -38,12 +38,10 @@ pub fn get_segments(encoded: &[u8]) -> Result<Vec<&[u8]>, Error> {
     for segment in segment_bounds {
         if segment.0 > encoded.len() {
             segments.push(&encoded[0..0])
+        } else if segment.1 > encoded.len() {
+            segments.push(&encoded[segment.0..])
         } else {
-            if segment.1 > encoded.len() {
-                segments.push(&encoded[segment.0..])
-            } else {
-                segments.push(&encoded[segment.0..segment.1])
-            }
+            segments.push(&encoded[segment.0..segment.1])
         }
     }
 
@@ -53,10 +51,10 @@ pub fn get_segments(encoded: &[u8]) -> Result<Vec<&[u8]>, Error> {
 #[cfg(test)]
 mod tests {
     use super::get_segments;
-    use crate::test::tests::{make_header};
+    use crate::test::tests::make_header;
 
     fn make_two_segment_rle_data() -> Vec<u8> {
-        let mut encoded = make_header(&mut vec![2,64,67]);
+        let mut encoded = make_header(&mut vec![2, 64, 67]);
 
         encoded.resize(70, 0);
         encoded[64] = 255; // literal run of 2
@@ -100,5 +98,4 @@ mod tests {
         assert_eq!(segments[0].len(), 2);
         assert_eq!(segments[1].len(), 0);
     }
-
 }

@@ -1,6 +1,6 @@
 #[cfg(test)]
 pub mod tests {
-    use byteorder::{LittleEndian, ByteOrder};
+    use byteorder::{ByteOrder, LittleEndian};
 
     pub fn make_header(values: &mut Vec<u32>) -> Vec<u8> {
         // make sure we have exactly 16 u32s

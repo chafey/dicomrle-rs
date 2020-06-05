@@ -1,7 +1,7 @@
-use crate::error::{Error};
-use std::io::Cursor;
-use std::convert::TryFrom;
+use crate::error::Error;
 use byteorder::{LittleEndian, ReadBytesExt};
+use std::convert::TryFrom;
+use std::io::Cursor;
 
 // helper function to read usize from the header
 fn read_usize(cursor: &mut Cursor<&&[u8]>) -> usize {
@@ -19,11 +19,11 @@ fn read_usize(cursor: &mut Cursor<&&[u8]>) -> usize {
 ///     1) Header is not long enough
 ///     2) Number of segments is invalid - must be 1..15 inclusive
 ///     3) Segment offsets are ascending in value
-/// 
+///
 /// # Arguments
 ///
 /// * `header_bytes` - The DICOM RLE Header
-/// 
+///
 #[allow(dead_code)]
 pub fn read_header(header_bytes: &[u8]) -> Result<Vec<usize>, Error> {
     // The DICOM RLE header is 64 bytes, validate to make sure we have
@@ -35,19 +35,23 @@ pub fn read_header(header_bytes: &[u8]) -> Result<Vec<usize>, Error> {
     // Create a Cursor on the header bytes so we can read usizes
     let mut reader = Cursor::new(&header_bytes);
 
-    // Read the segment count from the beginning of header  
+    // Read the segment count from the beginning of header
     let segment_count = read_usize(&mut reader);
 
     // validate number of segments
     if segment_count > 15 {
-        return Err(Error::Format("invalid header - cannot have more than 15 segments".to_owned()));
+        return Err(Error::Format(
+            "invalid header - cannot have more than 15 segments".to_owned(),
+        ));
     }
     if segment_count == 0 {
-        return Err(Error::Format("invalid header - cannot have zero segments".to_owned()));
+        return Err(Error::Format(
+            "invalid header - cannot have zero segments".to_owned(),
+        ));
     }
 
     // read each segment offset into a vector
-    let mut segment_offsets:Vec<usize> = Vec::new();
+    let mut segment_offsets: Vec<usize> = Vec::new();
     for _ in 0..segment_count {
         let segment_offset = read_usize(&mut reader);
         segment_offsets.push(segment_offset);
@@ -55,13 +59,17 @@ pub fn read_header(header_bytes: &[u8]) -> Result<Vec<usize>, Error> {
 
     // validate segment_offset #1 is 64
     if segment_offsets[0] != 64 {
-        return Err(Error::Format("invalid header - segment 1 offset must be 64".to_owned()));
+        return Err(Error::Format(
+            "invalid header - segment 1 offset must be 64".to_owned(),
+        ));
     }
 
     // validate each segment offset is > the one before it
     for segment_index in 1..segment_count {
         if segment_offsets[segment_index] < segment_offsets[segment_index - 1] {
-            return Err(Error::Format("invalid header - unexpected value for segment offset".to_owned()));
+            return Err(Error::Format(
+                "invalid header - unexpected value for segment offset".to_owned(),
+            ));
         }
     }
 
@@ -71,11 +79,11 @@ pub fn read_header(header_bytes: &[u8]) -> Result<Vec<usize>, Error> {
 #[cfg(test)]
 mod tests {
     use super::read_header;
-    use crate::test::tests::{make_header};
-    
+    use crate::test::tests::make_header;
+
     #[test]
     fn one_segment_header() {
-        let encoded = make_header(&mut vec![1,64]);
+        let encoded = make_header(&mut vec![1, 64]);
 
         let header = read_header(&encoded).unwrap();
 
@@ -85,7 +93,7 @@ mod tests {
 
     #[test]
     fn two_segment_header() {
-        let encoded = make_header(&mut vec![2,64,128]);
+        let encoded = make_header(&mut vec![2, 64, 128]);
 
         let header = read_header(&encoded).unwrap();
 
@@ -96,7 +104,7 @@ mod tests {
 
     #[test]
     fn three_segment_header() {
-        let encoded = make_header(&mut vec![3,64,128,256]);
+        let encoded = make_header(&mut vec![3, 64, 128, 256]);
 
         let header = read_header(&encoded).unwrap();
 
@@ -117,7 +125,9 @@ mod tests {
     #[test]
     #[should_panic]
     fn more_than_15_segments_panics() {
-        let encoded = make_header(&mut vec![16,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78]);
+        let encoded = make_header(&mut vec![
+            16, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78,
+        ]);
 
         read_header(&encoded).unwrap();
     }
@@ -125,7 +135,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn header_less_than_64_bytes_panics() {
-        let mut encoded = make_header(&mut vec![3,64,128,256]);
+        let mut encoded = make_header(&mut vec![3, 64, 128, 256]);
         encoded.resize(1, 0);
 
         read_header(&encoded).unwrap();

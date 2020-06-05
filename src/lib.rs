@@ -1,9 +1,9 @@
 //#![no_std]
 
 pub mod decode;
-pub mod error;
+mod decode_segment;
 pub mod diagnostics;
+pub mod error;
+mod get_segments;
 mod header;
 mod test;
-mod decode_segment;
-mod get_segments;

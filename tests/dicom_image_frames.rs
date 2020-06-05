@@ -1,10 +1,9 @@
-
 #[cfg(test)]
 mod tests {
-    use std::fs::File;
-    use std::io::{Read};
-    use dicomrle::error::{Error};
     use dicomrle::decode::{decode, decode_i16, decode_u16};
+    use dicomrle::error::Error;
+    use std::fs::File;
+    use std::io::Read;
     use std::slice;
 
     #[allow(dead_code)]
@@ -16,12 +15,16 @@ mod tests {
     }
 
     pub fn images_are_same<T>(a: &[T], b: &[T])
-    where T: PartialEq + std::fmt::Display
+    where
+        T: PartialEq + std::fmt::Display,
     {
         assert_eq!(a.len(), b.len());
         for i in 0..a.len() {
             if a[1] != b[1] {
-                assert!(false, format!("difference found at position {} {}!={}", i, a[i], b[i]));
+                assert!(
+                    false,
+                    format!("difference found at position {} {}!={}", i, a[i], b[i])
+                );
             }
         }
     }
@@ -39,7 +42,7 @@ mod tests {
         assert_eq!(result.incomplete_decode, false);
 
         // read raw image
-        let raw  = read_file(&format!("tests/rawimage/{}.raw", image_name))?;
+        let raw = read_file(&format!("tests/rawimage/{}.raw", image_name))?;
 
         // compare decoded buffer with raw image
         images_are_same(&decoded, &raw);
@@ -65,10 +68,10 @@ mod tests {
         assert_eq!(result.incomplete_decode, false);
 
         // read raw image
-        let raw  = read_file(&format!("tests/rawimage/ct.raw")).unwrap();
-        
-        let raw_i16 = unsafe { 
-            let ptr = raw.as_ptr() as *mut i16; 
+        let raw = read_file(&format!("tests/rawimage/ct.raw")).unwrap();
+
+        let raw_i16 = unsafe {
+            let ptr = raw.as_ptr() as *mut i16;
             slice::from_raw_parts_mut(ptr, raw.len() / 2)
         };
 
@@ -89,10 +92,10 @@ mod tests {
         assert_eq!(result.incomplete_decode, false);
 
         // read raw image
-        let raw  = read_file(&format!("tests/rawimage/ct.raw")).unwrap();
-        
-        let raw_u16 = unsafe { 
-            let ptr = raw.as_ptr() as *mut u16; 
+        let raw = read_file(&format!("tests/rawimage/ct.raw")).unwrap();
+
+        let raw_u16 = unsafe {
+            let ptr = raw.as_ptr() as *mut u16;
             slice::from_raw_parts_mut(ptr, raw.len() / 2)
         };
 
@@ -173,5 +176,4 @@ mod tests {
         let result = decode(&encoded, &mut decoded).unwrap();
         assert_eq!(result.incomplete_decode, true);
     }
-
 }

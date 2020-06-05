@@ -1,4 +1,3 @@
-
 // the result of decoding a single rle segment
 #[derive(Copy, Clone)]
 pub struct DecodeSegmentResult {
@@ -6,7 +5,7 @@ pub struct DecodeSegmentResult {
     pub bytes_decoded: usize,
 
     // true if the encoded data included a literal run but did not have
-    // enough bytes in the buffer for the literal run length.  This can 
+    // enough bytes in the buffer for the literal run length.  This can
     // occur if:
     //  * incomplete buffer stream
     //  * bug in encoder
@@ -30,34 +29,34 @@ pub struct DecodeSegmentResult {
 }
 
 /// Decodes a single DICOM RLE Segment
-/// 
+///
 /// # Arguments
 ///
 /// * `segment`   - The encoded RLE segment
-/// 
+///
 /// * `decoded`   - The decoded bytes will be stored here.  Must be presized to
 ///                 the expected number of decoded bytes.
 ///
 /// * `increment` - The number of bytes to increment after each byte is decoded.
-///                 This is usually the number of segments. 
-pub fn decode_segment(segment: &[u8], decoded: &mut[u8], increment: usize) -> DecodeSegmentResult {
+///                 This is usually the number of segments.
+pub fn decode_segment(segment: &[u8], decoded: &mut [u8], increment: usize) -> DecodeSegmentResult {
     let mut segment_index = 0;
     let mut decoded_index = 0;
-    
+
     let mut result = DecodeSegmentResult {
-        bytes_decoded: 0, 
+        bytes_decoded: 0,
         literal_run_underflow: false,
         replicated_run_underflow: false,
         decoded_overflow: false,
-        invalid_prefix: false
+        invalid_prefix: false,
     };
 
     while segment_index < segment.len() {
-
         let control = segment[segment_index];
         segment_index += 1;
 
-        if control <= 127 { // literal run of values case
+        if control <= 127 {
+            // literal run of values case
 
             // calculate the literal run length
             let literal_run_length = (control + 1) as usize;
@@ -82,10 +81,11 @@ pub fn decode_segment(segment: &[u8], decoded: &mut[u8], increment: usize) -> De
             // copy run_length run_values to decoded vector
             for _ in 0..literal_run_length {
                 decoded[decoded_index] = segment[segment_index];
-                decoded_index = decoded_index + increment;
+                decoded_index += increment;
                 segment_index += 1;
             }
-        } else if control > 128 { // replicated run of values case
+        } else if control > 128 {
+            // replicated run of values case
 
             // calculate the run length
             let run_length = (0 - control as i8) as usize + 1;
@@ -100,7 +100,7 @@ pub fn decode_segment(segment: &[u8], decoded: &mut[u8], increment: usize) -> De
             // detect if will write past end of decoded buffer. This can happen if:
             //  * bug in encoder
             //  * caller did not allocate big enough buffer for encoded
-            if (decoded_index + (run_length - 1 * increment)) >= decoded.len() {
+            if (decoded_index + ((run_length - 1) * increment)) >= decoded.len() {
                 result.decoded_overflow = true;
                 break;
             }
@@ -112,7 +112,7 @@ pub fn decode_segment(segment: &[u8], decoded: &mut[u8], increment: usize) -> De
             // write out the run to decoded buffer
             for _ in 0..run_length {
                 decoded[decoded_index] = run_value;
-                decoded_index = decoded_index + increment;
+                decoded_index += increment;
             }
         } else {
             // a control value of 128 is illegal as per the DICOM standard
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn literal_then_run() {
-        let segment = vec![0,0,255,0];
+        let segment = vec![0, 0, 255, 0];
         let mut decoded = Vec::new();
         decoded.resize(3, 0);
         let result = decode_segment(&segment, &mut decoded, 1);
@@ -149,12 +149,12 @@ mod tests {
         assert_eq!(false, result.replicated_run_underflow);
         assert_eq!(false, result.decoded_overflow);
         assert_eq!(false, result.invalid_prefix);
-        compare(&[0,0,0], &decoded);
+        compare(&[0, 0, 0], &decoded);
     }
 
     #[test]
     fn run_then_literal() {
-        let segment = vec![255,0,0,0];
+        let segment = vec![255, 0, 0, 0];
         let mut decoded = Vec::new();
         decoded.resize(3, 0);
         let result = decode_segment(&segment, &mut decoded, 1);
@@ -163,12 +163,12 @@ mod tests {
         assert_eq!(false, result.replicated_run_underflow);
         assert_eq!(false, result.decoded_overflow);
         assert_eq!(false, result.invalid_prefix);
-        compare(&[0,0,0], &decoded);
+        compare(&[0, 0, 0], &decoded);
     }
 
     #[test]
     fn run_only() {
-        let segment = vec![255,0];
+        let segment = vec![255, 0];
         let mut decoded = Vec::new();
         decoded.resize(2, 0);
         let result = decode_segment(&segment, &mut decoded, 1);
@@ -177,12 +177,12 @@ mod tests {
         assert_eq!(false, result.replicated_run_underflow);
         assert_eq!(false, result.decoded_overflow);
         assert_eq!(false, result.invalid_prefix);
-        compare(&[0,0], &decoded);
+        compare(&[0, 0], &decoded);
     }
 
     #[test]
     fn literal_only() {
-        let segment = vec![0,0];
+        let segment = vec![0, 0];
         let mut decoded = Vec::new();
         decoded.resize(1, 0);
         let result = decode_segment(&segment, &mut decoded, 1);
@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn decoded_overflow_on_literal_run() {
-        let segment = vec![0,0];
+        let segment = vec![0, 0];
         let mut decoded = Vec::new();
         decoded.resize(0, 0);
         let result = decode_segment(&segment, &mut decoded, 1);
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn decoded_overflow_on_replicated_run() {
-        let segment = vec![255,0];
+        let segment = vec![255, 0];
         let mut decoded = Vec::new();
         decoded.resize(0, 0);
         let result = decode_segment(&segment, &mut decoded, 1);
