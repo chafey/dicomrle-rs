@@ -31,9 +31,7 @@ pub fn decode(encoded: &[u8], decoded: &mut [u8]) -> Result<DecodeDiagnostics, E
 
     let segment_count = segments.len();
 
-    for segment_index in 0..segment_count {
-        let segment = segments[segment_index];
-
+    for (segment_index, segment) in segments.iter().enumerate() {
         let start_index = calculate_start_index(segment_count, segment_index);
 
         let result = decode_segment(segment, &mut decoded[start_index..], segment_count);

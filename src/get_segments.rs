@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::header::read_header;
 
-fn to_segment_bounds(segment_offsets: &Vec<usize>, encoded_length: usize) -> Vec<(usize, usize)> {
+fn to_segment_bounds(segment_offsets: &[usize], encoded_length: usize) -> Vec<(usize, usize)> {
     let mut result = Vec::new();
     for segment_index in 0..segment_offsets.len() - 1 {
         let start = segment_offsets[segment_index];
